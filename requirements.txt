@@ -1,0 +1,6 @@
+# Python 3.12 recommended; package versions are constrained, not a lockfile.
+numpy>=2.0,<3
+pandas>=3.0,<4
+matplotlib>=3.8,<4
+scikit-learn>=1.9,<2
+ipykernel>=6.29,<8
