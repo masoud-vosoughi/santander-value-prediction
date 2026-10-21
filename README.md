@@ -1,126 +1,91 @@
 # Santander Transaction Value Prediction
 
-**A reproducible, experiment-driven regression project** based on the 2018 [Kaggle Santander Value Prediction Challenge](https://www.kaggle.com/competitions/santander-value-prediction-challenge).
+An end-to-end tabular regression project exploring **data analysis, model selection, feature engineering, and reusable inference** using the [Santander Value Prediction Challenge](https://www.kaggle.com/competitions/santander-value-prediction-challenge) dataset.
 
-> **Project stage:** Data exploration, constant baselines, and initial Decision Tree experiments. **Not** a production-ready model or a claim to leaderboard performance.
+## Problem and data
 
-## What problem does this solve?
+Predict transaction values from anonymized numerical features. The labeled data is obtained from [OpenML (dataset 42572)](https://www.openml.org/search?id=42572&type=data), not the original Kaggle competition test set.
 
-Given anonymized numeric features for a potential banking customer, estimate the value of their transaction. This is **supervised regression**, not churn prediction, a classification problem, or customer lifetime value estimation.
+- **Observations:** 4,459; **input features:** 4,991; **target:** transaction value.
+- **Data characteristics:** no missing values, 256 constant-zero columns, and approximately 96.85% zero entries.
+- **Metric:** root mean squared logarithmic error (RMSLE). Models are trained on `log1p(target)` and predictions are converted back with `expm1`.
 
-**Primary metric — RMSLE**:
+## Approach
 
-$$
-\operatorname{RMSLE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}\left[\ln(1+\hat{y}_i)-\ln(1+y_i)\right]^2}
-$$
+1. Explore sparsity, target skewness, and data quality.
+2. Establish constant-prediction baselines and compare tree-based regressors.
+3. Select model settings using **5-fold cross-validation on an 80% development partition**.
+4. Test row-level features individually and retain changes that improve cross-validation performance.
+5. Serialize the selected LightGBM model and implement reusable prediction code with basic input-schema validation.
 
-RMSLE evaluates deviations in logarithmic space. It reduces the dominance of large-value targets compared with RMSE in original units. Predictions and targets must be non-negative.
+The selected engineered features are **`row_sum`**, **`row_max`**, and **`row_max_share = row_max / row_sum`** (with a safe zero-denominator fallback). They are computed from the original feature columns.
 
-## Dataset
+## Results
 
-| Property | Description |
-|---|---|
-| Source | [OpenML dataset 42572](https://www.openml.org/search?id=42572&type=data) |
-| Original challenge | [Santander Value Prediction](https://www.kaggle.com/competitions/santander-value-prediction-challenge) |
-| Training observations | 4,459 |
-| Feature columns | 4,991 numerical, anonymized |
-| Target | `target` (transaction value) |
-| Availability | Labeled training data from OpenML; **not** the original unlabeled Kaggle test file |
-
-Source data is **not** committed here. Review any applicable dataset redistribution and usage terms before using the data. OpenML access/cache is required to run the notebooks.
-
-## Research questions and what we learned
-
-| Question | Evidence | Interpretation / action |
-|---|---|---|
-| Are there missing values? | 0 missing cells | No imputation currently needed |
-| Are there constant columns? | 256, all zero | Candidate for removal in a training-fitted preprocessing pipeline |
-| Are zeroes common? | 96.85% of feature values | Do not drop zero entries indiscriminately |
-| Could non-zero row counts help? | Mean 157, max 1,989; Spearman ρ ≈ −0.0447 with target | Try as a feature only if CV justifies it |
-| Is target skewed? | Mean ≈ 5.94M vs median 2.26M; max 40M | Consider log-target modeling and RMSLE |
-| Does using features beat a constant prediction? | Tree better than baseline on all five training-CV folds | Continue model experiments |
-| Does a deeper tree always improve CV? | Improvements level off past depth 10 | Track generalization gap and choose reasonable complexity |
-| Does regularization help? | Leaf size 50 outperforms 5 and 20 under five-fold CV | Keep as current best **tested** tree setting |
-
-**Important:** The original input fields are anonymized. We do not claim to know the underlying banking meaning of individual columns.
-
-## Results so far
-
-### Initial holdout experiments (80% train / 20% validation)
-
-| Constant baseline | Validation RMSLE |
+| Model | Mean 5-fold CV RMSLE ↓ |
 |---|---:|
-| Mean | 2.0351 |
-| Median | 1.7021 |
-| **Log-Mean** | **1.6963** |
+| Log-mean baseline | 1.7644 |
+| Decision Tree | 1.6458 |
+| Random Forest | 1.5427 |
+| Gradient Boosting | 1.5306 |
+| LightGBM (original features) | 1.4668 |
+| **LightGBM + engineered features** | **1.4304** |
 
-A Decision Tree with `max_depth=5`, `min_samples_leaf=20` obtained train RMSLE **1.5782** and holdout validation RMSLE **1.5862**. These are **preliminary** holdout readings, not untouched test performance.
+Adding the three engineered features improved the selected LightGBM model's CV RMSLE from **1.4668 to 1.4304**. The corresponding **exploratory holdout RMSLE** improved from **1.4504 to 1.4147**.
 
-### Paired five-fold CV on the 80% training portion
+**Evaluation caveat:** The same CV folds were used repeatedly for model selection, and the 20% holdout was inspected during earlier development. These scores are **development results**, not an unbiased final test estimate or a Kaggle leaderboard result.
 
-| Approach | Mean RMSLE |
-|---|---:|
-| Log-Mean constant baseline | 1.7644 |
-| Initial tree (depth 5, leaf 20) | 1.6935 |
-| **Best tested tree (depth 10, leaf 50)** | **1.6458** |
-
-The best tested tree reduces the baseline's mean CV RMSLE by approximately **6.72%** on these folds. The baseline is recomputed inside each training fold, and every compared model uses the same folds.
-
-**Scope/limitations:** Only a small set of hyperparameters has been explored. Repeatedly comparing models on the same folds can make the selected model's CV score optimistic. The original 20% holdout has already been used for exploratory checks, so we **do not** claim it is an untouched final test set. No Kaggle leaderboard score is claimed.
-
-## Repository layout
+## Repository structure
 
 ```text
-santander-value-prediction/
-├── notebooks/
-│   ├── 01_data_understanding.ipynb
-│   ├── 02_baseline_models.ipynb
-│   └── 03_decision_tree_experiments.ipynb
-├── README.md
-├── requirements.txt
-├── .gitignore
-└── SETUP_AND_VERIFICATION.md
+notebooks/
+  01_data_understanding.ipynb
+  02_baseline_models.ipynb
+  03_decision_tree_experiments.ipynb
+  04_ensemble_models.ipynb
+  05_feature_engineering.ipynb
+src/
+  __init__.py
+  features.py
+  predict.py
+models/
+  santander_lgbm.joblib
+requirements.txt
+README.md
 ```
 
-**Narrative flow:**
-1. **Data understanding** — shape, feature dtypes, zero prevalence, row-level activity, target distribution.
-2. **Baseline models** — mean, median, and RMSLE-aligned log-mean constants.
-3. **Decision Tree experiments** — holdout check, paired CV, depth/leaf-size studies, model-selection caveats.
+## Setup and usage
 
-Each notebook repeats the **minimal loading and split setup** intentionally so it can be run independently in VS Code. We will centralize reusable logic in `src/` only when doing so actually reduces duplication.
-
-## Installation and execution
-
-Tested originally on macOS with Python **3.12** in a project `.venv`.
+Python **3.12** is recommended. From the repository root:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-code .
 ```
 
-In VS Code, ensure the **Python** and **Jupyter** extensions are installed. Open any `.ipynb`, select the `.venv` kernel, then choose **Restart Kernel and Run All**. Initial OpenML download requires internet access. Read [SETUP_AND_VERIFICATION.md](SETUP_AND_VERIFICATION.md) for copying these files into an existing repo and for acceptance checks.
+On macOS, LightGBM also requires the OpenMP runtime: `brew install libomp` (Homebrew).
 
-## Methodological guardrails
+Run the notebooks in numbered order, or open each independently in VS Code and select the project's `.venv` kernel. A network connection is needed for the initial OpenML download.
 
-- Targets are log-transformed for RMSE training/scoring where RMSLE equivalence holds; `np.expm1()` restores the original scale for values shown to users.
-- Preprocessing, feature selection, and fitted transformations must be learned from **training folds**, not from validation targets/data.
-- Do not compare a holdout score to a CV score as if they used identical data partitions.
-- Do not infer causal relations or business semantics from anonymized numeric columns.
-- Preserve the distinction between **observed CV improvement** and **unbiased new-data performance**.
+To predict with the saved model using the **original 4,991-column input schema**:
 
-## Planned next steps
+```python
+from sklearn.datasets import fetch_openml
+from src.predict import predict_values
 
-- Compare Random Forest and gradient boosting under consistent folds and metric.
-- Evaluate zero-based/statistical feature engineering and training-fitted constant-column removal.
-- Use defensible final evaluation procedures and error analysis.
-- Refactor reusable modeling code into modules and add meaningful tests, without unnecessary infrastructure.
-- Review and attribute public competition solution ideas, separately from our own experimental findings.
+X = fetch_openml(data_id=42572, as_frame=True).data
+X = X.drop(columns=["ID"], errors="ignore")
+print(predict_values(X.head(3)))
+```
 
-## Attribution
+The prediction module adds engineered features, validates the expected columns, loads the saved model, and returns nonnegative predictions in the original target scale. Load serialized models only from trusted sources.
 
-- [Original Kaggle competition](https://www.kaggle.com/competitions/santander-value-prediction-challenge)
-- [OpenML data catalog entry](https://www.openml.org/search?id=42572&type=data)
+## Limitations
 
-The code and write-up here are a guided independent portfolio exercise, not an official Santander solution.
+Feature names are anonymized, so feature importance cannot establish business meaning or causality. The dataset is small relative to its dimensionality, model selection has reused the same folds, and a fully untouched test set is not available in this workflow. Raw data is not redistributed here; check the source's applicable usage terms.
+
+## References
+
+- [Santander Value Prediction Challenge (Kaggle)](https://www.kaggle.com/competitions/santander-value-prediction-challenge)
+- [Dataset 42572 (OpenML)](https://www.openml.org/search?id=42572&type=data)
