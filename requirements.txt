@@ -4,3 +4,5 @@ pandas>=3.0,<4
 matplotlib>=3.8,<4
 scikit-learn>=1.9,<2
 ipykernel>=6.29,<8
+lightgbm>=4.7,<5
+joblib>=1.4,<2
