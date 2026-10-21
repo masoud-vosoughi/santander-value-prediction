@@ -6,12 +6,7 @@ import pandas as pd
 
 from .features import add_engineered_features
 
-
-MODEL_PATH = (
-    Path(__file__).resolve().parent.parent
-    / "models"
-    / "santander_lgbm.joblib"
-)
+MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "santander_lgbm.joblib"
 
 
 def predict_values(X: pd.DataFrame) -> np.ndarray:
