@@ -10,7 +10,17 @@ MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "santander_lgbm
 
 
 def predict_values(X: pd.DataFrame) -> np.ndarray:
-    """Predict target values from raw input features."""
+
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame.")
+    if not X.columns.is_unique:
+        raise ValueError("Input contains duplicate column names.")
+    if X.isna().any().any():
+        raise ValueError("Input contains missing values.")
+    if not all(pd.api.types.is_numeric_dtype(dtype) for dtype in X.dtypes):
+        raise TypeError("All input columns must be numeric.")
+    if not np.isfinite(X.to_numpy(dtype=np.float64)).all():
+        raise ValueError("Input contains infinite values.")
 
     artifact = joblib.load(MODEL_PATH)
 
