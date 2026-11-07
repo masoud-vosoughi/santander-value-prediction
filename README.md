@@ -15,8 +15,8 @@ Predict transaction values from anonymized numerical features. The labeled data 
 1. Explore sparsity, target skewness, and data quality.
 2. Establish constant-prediction baselines and compare tree-based regressors.
 3. Select model settings using **5-fold cross-validation on an 80% development partition**.
-4. Test row-level features individually and retain changes that improve cross-validation performance.
-5. Serialize the selected LightGBM model and implement reusable prediction code with basic input-schema validation.
+4. Evaluate row-level features incrementally and retain those that improve cross-validation performance.
+5. Serialize the selected LightGBM model and implement reusable prediction code with input type, data quality, and feature-schema validation.
 
 The selected engineered features are **`row_sum`**, **`row_max`**, and **`row_max_share = row_max / row_sum`** (with a safe zero-denominator fallback). They are computed from the original feature columns.
 
